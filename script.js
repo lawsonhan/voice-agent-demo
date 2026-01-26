@@ -8,6 +8,7 @@ class VoiceAgent {
     constructor(elementId) {
         this.element = document.getElementById(elementId);
         this.state = STATES.IDLE;
+        this.listeningTimer = null; // Timer for silence timeout
         
         // --- Core Components ---
         this.recognition = this.initSpeechRecognition();
@@ -27,15 +28,18 @@ class VoiceAgent {
 
         const recognition = new SpeechRecognition();
         recognition.continuous = false; // Stop after one sentence
-        recognition.lang = 'en-US';     // Default to English, change to 'zh-CN' for Chinese
+        recognition.lang = 'en-US';     
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
         recognition.onstart = () => {
             console.log("Microphone active.");
+            // Start a 5-second safety timer. If no speech result by then, abort.
+            this.startListeningTimer();
         };
 
         recognition.onresult = (event) => {
+            this.clearListeningTimer(); // Speech detected, clear timeout
             const transcript = event.results[0][0].transcript;
             console.log("User said:", transcript);
             this.processUserUnput(transcript);
@@ -43,12 +47,21 @@ class VoiceAgent {
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error", event.error);
+            this.clearListeningTimer();
             this.transitionTo(STATES.IDLE);
         };
 
         recognition.onend = () => {
-            // If we are still in listening state but no result, go back to idle
-            // (Handled by processUserUnput logic usually)
+            // Usually fires after result or error. 
+            // If we are still 'listening' (e.g. user just stopped speaking but no result yet processed),
+            // we might want to go to idle. 
+            // But usually onresult handles the state change to 'processing' (which we simulate by staying in listening or moving to thinking).
+            
+            // If we are still explicitly in LISTENING state after onend, it means no result was processed.
+            if (this.state === STATES.LISTENING) {
+                console.log("Recognition ended without result.");
+                this.transitionTo(STATES.IDLE);
+            }
         };
 
         return recognition;
@@ -57,8 +70,13 @@ class VoiceAgent {
     handleInteraction() {
         if (this.state === STATES.IDLE) {
             this.startListening();
+        } else if (this.state === STATES.LISTENING) {
+            // Manual Stop Listening
+            console.log("Manual stop listening");
+            this.stopListening();
         } else if (this.state === STATES.SPEAKING) {
-            // Allow interrupting the agent
+            // Manual Stop Speaking
+            console.log("Manual stop speaking");
             this.synth.cancel();
             this.transitionTo(STATES.IDLE);
         }
@@ -76,9 +94,32 @@ class VoiceAgent {
         }
     }
 
+    stopListening() {
+        if (this.recognition) {
+            this.recognition.stop(); // This triggers onend
+            this.clearListeningTimer();
+        }
+    }
+
+    startListeningTimer() {
+        this.clearListeningTimer();
+        this.listeningTimer = setTimeout(() => {
+            console.log("Listening timeout - no speech detected.");
+            this.stopListening(); 
+        }, 5000); // 5 seconds timeout
+    }
+
+    clearListeningTimer() {
+        if (this.listeningTimer) {
+            clearTimeout(this.listeningTimer);
+            this.listeningTimer = null;
+        }
+    }
+
     async processUserUnput(text) {
-        // Visual feedback: Maybe stay in 'Listening' but freeze animation? 
-        // For now, we keep the green waveform while "Thinking"
+        // Here we could transition to a 'THINKING' state if we had one.
+        // For now, let's keep the waveform but maybe pause it? 
+        // Or just let it stay until we get the reply.
         
         try {
             const response = await fetch(this.backendUrl, {
@@ -103,16 +144,11 @@ class VoiceAgent {
 
     speak(text) {
         if (this.synth.speaking) {
-            console.error('speechSynthesis.speaking');
-            return;
+            this.synth.cancel(); // Stop current speech if any
         }
 
         const utterance = new SpeechSynthesisUtterance(text);
         
-        // Optional: Select a specific voice
-        // const voices = this.synth.getVoices();
-        // utterance.voice = voices.find(v => v.name === 'Samantha'); 
-
         utterance.onstart = () => {
             this.transitionTo(STATES.SPEAKING);
         };
@@ -130,6 +166,9 @@ class VoiceAgent {
     }
 
     transitionTo(newState) {
+        // Prevent state thrashing if already in state
+        if (this.state === newState) return;
+
         console.log(`Transitioning: ${this.state} -> ${newState}`);
         this.state = newState;
         this.element.setAttribute('data-state', newState);
