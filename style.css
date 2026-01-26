@@ -1,5 +1,13 @@
-#toggle {
-  display: none;
+body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #1a1a1a;
+    color: white;
+    font-family: system-ui, -apple-system, sans-serif;
 }
 
 .orb-button {
@@ -11,9 +19,12 @@
   height: 200px;
   position: relative;
   user-select: none;
+  background: none;
+  border: none;
+  padding: 0;
 }
 
-.orb {
+.orb-idle {
   width: 160px;
   height: 160px;
   border-radius: 50%;
@@ -43,7 +54,7 @@
   }
 }
 
-.orb svg {
+.orb-idle svg {
   width: 70px;
   height: 70px;
   fill: #fff;
@@ -52,15 +63,6 @@
   transition:
     opacity 0.4s ease,
     transform 0.4s ease;
-}
-
-.orb-inner {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.3s ease;
 }
 
 .waveform {
@@ -162,46 +164,50 @@
   }
 }
 
-/* Listening state */
-#toggle:checked + .orb-button.state-listening .orb svg {
+/* Yellow orb container - exact match to reference */
+.orb-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  rotate: 90deg;
+  cursor: pointer;
+  filter: drop-shadow(0 0 6px #ffd70088) drop-shadow(0 0 6px #ffaa0088);
+  transition: all 0.3s ease;
   opacity: 0;
-  transform: scale(0.5);
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
-#toggle:checked + .orb-button.state-listening .orb {
-  opacity: 0;
-  transform: scale(0.2);
-}
-
-#toggle:checked + .orb-button.state-listening .waveform {
-  opacity: 1;
-}
-
-#toggle:checked + .orb-button.state-listening .orb-inner {
-  opacity: 0;
-}
-
-/* Speaking state - Yellow orb */
-#toggle:checked + .orb-button.state-speaking .orb {
+.orb-speaking {
+  position: absolute;
+  width: 200px;
+  aspect-ratio: 1;
+  border-radius: 50%;
   background: #060606;
   filter: blur(24px);
-  opacity: 1;
-  transform: scale(1);
-  animation: orbRotate 6s infinite;
-  box-shadow: none;
+  transition: all 0.3s ease;
 }
 
-#toggle:checked + .orb-button.state-speaking .orb svg {
-  opacity: 0;
-  transform: scale(0.5);
+.state-speaking .orb-container .orb-speaking {
+  width: 220px;
+  animation: rotateOrb 6s infinite;
 }
 
-#toggle:checked + .orb-button.state-speaking .waveform {
-  opacity: 0;
+@keyframes rotateOrb {
+  50% {
+    transform: rotate(180deg);
+  }
 }
 
-#toggle:checked + .orb-button.state-speaking .orb-inner {
-  opacity: 1;
+.orb-inner {
+  position: absolute;
   left: -120%;
   top: -25%;
   width: 160%;
@@ -221,9 +227,10 @@
     39% 35%
   );
   animation: rotateInner 6s linear infinite;
+  transition: all 0.3s ease;
 }
 
-#toggle:checked + .orb-button.state-speaking .orb-inner:nth-child(2) {
+.orb-inner:nth-child(2) {
   left: auto;
   right: -120%;
   top: auto;
@@ -246,19 +253,6 @@
   );
 }
 
-.orb-button.state-speaking {
-  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.53)) drop-shadow(0 0 6px rgba(255, 170, 0, 0.53));
-}
-
-@keyframes orbRotate {
-  0% {
-    transform: rotate(0deg) scale(1);
-  }
-  100% {
-    transform: rotate(360deg) scale(1);
-  }
-}
-
 @keyframes rotateInner {
   0% {
     transform: rotate(0deg);
@@ -266,4 +260,64 @@
   100% {
     transform: rotate(360deg);
   }
+}
+
+.state-speaking .orb-container .orb-speaking .orb-inner {
+  width: 170%;
+}
+
+/* State-based visibility */
+.state-idle .orb-idle {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.state-idle .orb-idle svg {
+  opacity: 0.95;
+  transform: scale(1);
+}
+
+.state-idle .waveform {
+  opacity: 0;
+}
+
+.state-idle .orb-container {
+  opacity: 0;
+}
+
+.state-listening .orb-idle {
+  opacity: 0;
+  transform: scale(0.2);
+}
+
+.state-listening .orb-idle svg {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.state-listening .waveform {
+  opacity: 1;
+}
+
+.state-listening .orb-container {
+  opacity: 0;
+}
+
+.state-speaking .orb-idle {
+  opacity: 0;
+  transform: scale(0.2);
+}
+
+.state-speaking .orb-idle svg {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.state-speaking .waveform {
+  opacity: 0;
+}
+
+.state-speaking .orb-container {
+  opacity: 1;
+  pointer-events: auto;
 }

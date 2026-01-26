@@ -5,26 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Agent Demo</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-color: #1a1a1a;
-            color: white;
-            font-family: system-ui, -apple-system, sans-serif;
-        }
-    </style>
 </head>
 <body>
 
-<input type="checkbox" id="toggle" />
-
-<label for="toggle" class="orb-button">
-  <div class="orb">
+<button class="orb-button state-idle" id="voiceButton">
+  <!-- Idle state: mic orb -->
+  <div class="orb orb-idle">
     <svg
       xmlns="http://www.w3.org/2000/svg"
       fill="currentColor"
@@ -36,9 +22,9 @@
         d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"
       ></path>
     </svg>
-    <div class="orb-inner"></div>
-    <div class="orb-inner"></div>
   </div>
+  
+  <!-- Listening state: waveform -->
   <div class="waveform">
     <div class="bar"></div>
     <div class="bar"></div>
@@ -53,7 +39,15 @@
     <div class="bar"></div>
     <div class="bar"></div>
   </div>
-</label>
+  
+  <!-- Speaking state: yellow orb container -->
+  <div class="orb-container">
+    <div class="orb orb-speaking">
+      <div class="orb-inner"></div>
+      <div class="orb-inner"></div>
+    </div>
+  </div>
+</button>
 
 <script src="script.js"></script>
 </body>

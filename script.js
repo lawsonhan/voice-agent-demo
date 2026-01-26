@@ -1,9 +1,7 @@
 class VoiceAgentStateMachine {
-  constructor(checkboxElement, buttonElement) {
-    this.checkbox = checkboxElement;
+  constructor(buttonElement) {
     this.button = buttonElement;
     this.currentState = 'idle';
-    this.isUpdating = false;
     this.timers = {
       listening: null,
       speaking: null
@@ -13,11 +11,7 @@ class VoiceAgentStateMachine {
   }
   
   init() {
-    this.checkbox.addEventListener('change', () => {
-      if (!this.isUpdating) {
-        this.handleToggle();
-      }
-    });
+    this.button.addEventListener('click', () => this.handleClick());
     this.updateState('idle');
   }
   
@@ -33,23 +27,13 @@ class VoiceAgentStateMachine {
   }
   
   updateState(newState) {
-    this.isUpdating = true;
     this.clearAllTimers();
     this.currentState = newState;
     
     // Remove all state classes
-    this.button.classList.remove('state-listening', 'state-speaking');
-    
-    // Update checkbox state
-    if (newState === 'idle') {
-      this.checkbox.checked = false;
-    } else {
-      this.checkbox.checked = true;
-      // Add state class for listening or speaking
-      this.button.classList.add(`state-${newState}`);
-    }
-    
-    this.isUpdating = false;
+    this.button.classList.remove('state-idle', 'state-listening', 'state-speaking');
+    // Add new state class
+    this.button.classList.add(`state-${newState}`);
     
     // Set up timers based on new state
     if (newState === 'listening') {
@@ -63,14 +47,11 @@ class VoiceAgentStateMachine {
     }
   }
   
-  handleToggle() {
-    if (this.checkbox.checked) {
-      // Toggle ON: transition to listening (only if idle)
-      if (this.currentState === 'idle') {
-        this.updateState('listening');
-      }
+  handleClick() {
+    if (this.currentState === 'idle') {
+      this.updateState('listening');
     } else {
-      // Toggle OFF: interrupt and return to idle
+      // Interrupt any state and return to idle
       this.updateState('idle');
     }
   }
@@ -78,9 +59,8 @@ class VoiceAgentStateMachine {
 
 // Initialize state machine when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  const toggle = document.getElementById('toggle');
-  const orbButton = document.querySelector('.orb-button');
-  if (toggle && orbButton) {
-    new VoiceAgentStateMachine(toggle, orbButton);
+  const voiceButton = document.getElementById('voiceButton');
+  if (voiceButton) {
+    new VoiceAgentStateMachine(voiceButton);
   }
 });
