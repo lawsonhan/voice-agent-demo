@@ -22,20 +22,27 @@
 
   <!-- State 2: LISTENING (Waveform) -->
   <div class="visual-layer listening-layer">
-    <div class="waveform">
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
+    <div class="orb-listening">
+      <div class="waveform">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
     </div>
+  </div>
+
+  <!-- State 2.5: PROCESSING (Spinner) -->
+  <div class="visual-layer processing-layer">
+    <div class="spinner"></div>
   </div>
 
   <!-- State 3: SPEAKING (Complex Orb from Uiverse) -->
@@ -48,6 +55,15 @@
     </div>
   </div>
 
+</div>
+
+<div id="transcript" class="transcript-display"></div>
+
+<div id="dev-controls">
+  <button class="dev-btn" onclick="agent.transitionTo('idle')">Idle</button>
+  <button class="dev-btn" onclick="agent.transitionTo('listening')">Listening</button>
+  <button class="dev-btn" onclick="agent.transitionTo('processing')">Processing</button>
+  <button class="dev-btn" onclick="agent.transitionTo('speaking')">Speaking</button>
 </div>
 
 <script src="script.js"></script>

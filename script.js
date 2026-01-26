@@ -1,65 +1,77 @@
 const STATES = {
     IDLE: 'idle',
     LISTENING: 'listening',
+    PROCESSING: 'processing',
     SPEAKING: 'speaking'
 };
 
 class VoiceAgent {
     constructor(elementId) {
         this.element = document.getElementById(elementId);
+        this.transcriptDisplay = document.getElementById('transcript');
         this.state = STATES.IDLE;
-        this.listeningTimer = null; // Timer for silence timeout
+        this.listeningTimer = null;
         
-        // --- Core Components ---
         this.recognition = this.initSpeechRecognition();
         this.synth = window.speechSynthesis;
         this.backendUrl = 'http://localhost:8000/chat';
 
-        // --- Event Listeners ---
         this.element.addEventListener('click', () => this.handleInteraction());
     }
 
     initSpeechRecognition() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            alert("Your browser does not support Speech Recognition. Please use Chrome or Safari.");
+            alert("Your browser does not support Speech Recognition.");
             return null;
         }
 
         const recognition = new SpeechRecognition();
-        recognition.continuous = false; // Stop after one sentence
+        recognition.continuous = false;
         recognition.lang = 'en-US';     
-        recognition.interimResults = false;
+        recognition.interimResults = true; 
         recognition.maxAlternatives = 1;
 
         recognition.onstart = () => {
             console.log("Microphone active.");
-            // Start a 5-second safety timer. If no speech result by then, abort.
+            this.updateTranscript("Listening...");
             this.startListeningTimer();
         };
 
         recognition.onresult = (event) => {
-            this.clearListeningTimer(); // Speech detected, clear timeout
-            const transcript = event.results[0][0].transcript;
-            console.log("User said:", transcript);
-            this.processUserUnput(transcript);
+            this.clearListeningTimer();
+            
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            const textToShow = finalTranscript || interimTranscript;
+            this.updateTranscript(textToShow);
+
+            if (finalTranscript) {
+                console.log("Final User said:", finalTranscript);
+                this.processUserInput(finalTranscript);
+            }
         };
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error", event.error);
             this.clearListeningTimer();
-            this.transitionTo(STATES.IDLE);
+            this.updateTranscript("Error: " + event.error);
+            setTimeout(() => this.transitionTo(STATES.IDLE), 2000);
         };
 
         recognition.onend = () => {
-            // Usually fires after result or error. 
-            // If we are still 'listening' (e.g. user just stopped speaking but no result yet processed),
-            // we might want to go to idle. 
-            // But usually onresult handles the state change to 'processing' (which we simulate by staying in listening or moving to thinking).
-            
-            // If we are still explicitly in LISTENING state after onend, it means no result was processed.
             if (this.state === STATES.LISTENING) {
                 console.log("Recognition ended without result.");
+                this.updateTranscript(""); 
                 this.transitionTo(STATES.IDLE);
             }
         };
@@ -71,12 +83,8 @@ class VoiceAgent {
         if (this.state === STATES.IDLE) {
             this.startListening();
         } else if (this.state === STATES.LISTENING) {
-            // Manual Stop Listening
-            console.log("Manual stop listening");
             this.stopListening();
-        } else if (this.state === STATES.SPEAKING) {
-            // Manual Stop Speaking
-            console.log("Manual stop speaking");
+        } else if (this.state === STATES.SPEAKING || this.state === STATES.PROCESSING) {
             this.synth.cancel();
             this.transitionTo(STATES.IDLE);
         }
@@ -84,7 +92,6 @@ class VoiceAgent {
 
     startListening() {
         if (!this.recognition) return;
-        
         try {
             this.transitionTo(STATES.LISTENING);
             this.recognition.start();
@@ -96,7 +103,7 @@ class VoiceAgent {
 
     stopListening() {
         if (this.recognition) {
-            this.recognition.stop(); // This triggers onend
+            this.recognition.stop();
             this.clearListeningTimer();
         }
     }
@@ -104,9 +111,10 @@ class VoiceAgent {
     startListeningTimer() {
         this.clearListeningTimer();
         this.listeningTimer = setTimeout(() => {
-            console.log("Listening timeout - no speech detected.");
+            console.log("Listening timeout.");
+            this.updateTranscript("No speech detected.");
             this.stopListening(); 
-        }, 5000); // 5 seconds timeout
+        }, 5000);
     }
 
     clearListeningTimer() {
@@ -116,11 +124,21 @@ class VoiceAgent {
         }
     }
 
-    async processUserUnput(text) {
-        // Here we could transition to a 'THINKING' state if we had one.
-        // For now, let's keep the waveform but maybe pause it? 
-        // Or just let it stay until we get the reply.
-        
+    updateTranscript(text) {
+        if (this.transcriptDisplay) {
+            this.transcriptDisplay.textContent = text;
+            if (text) {
+                this.transcriptDisplay.classList.add('active');
+            } else {
+                this.transcriptDisplay.classList.remove('active');
+            }
+        }
+    }
+
+    async processUserInput(text) {
+        this.updateTranscript(text); 
+        this.transitionTo(STATES.PROCESSING);
+
         try {
             const response = await fetch(this.backendUrl, {
                 method: 'POST',
@@ -138,23 +156,26 @@ class VoiceAgent {
 
         } catch (error) {
             console.error("Error talking to backend:", error);
-            this.speak("Sorry, I couldn't reach my brain. Is the backend running?");
+            this.updateTranscript("Backend Error. Is it running?");
+            this.speak("Sorry, I couldn't reach my brain.");
         }
     }
 
     speak(text) {
         if (this.synth.speaking) {
-            this.synth.cancel(); // Stop current speech if any
+            this.synth.cancel();
         }
 
         const utterance = new SpeechSynthesisUtterance(text);
         
         utterance.onstart = () => {
             this.transitionTo(STATES.SPEAKING);
+            this.updateTranscript(text); 
         };
 
         utterance.onend = () => {
             this.transitionTo(STATES.IDLE);
+            this.updateTranscript(""); 
         };
 
         utterance.onerror = (e) => {
@@ -166,14 +187,16 @@ class VoiceAgent {
     }
 
     transitionTo(newState) {
-        // Prevent state thrashing if already in state
         if (this.state === newState) return;
 
         console.log(`Transitioning: ${this.state} -> ${newState}`);
         this.state = newState;
         this.element.setAttribute('data-state', newState);
+        
+        if (newState === STATES.IDLE) {
+            this.updateTranscript("");
+        }
     }
 }
 
-// Initialize the agent
 const agent = new VoiceAgent('agent-button');
