@@ -8,46 +8,40 @@
 </head>
 <body>
 
-<button class="orb-button state-idle" id="voiceButton">
-  <!-- Idle state: mic orb -->
-  <div class="orb orb-idle">
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="currentColor"
-      class="bi bi-mic-fill"
-      viewBox="0 0 16 16"
-    >
-      <path d="M5 3a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0z"></path>
-      <path
-        d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"
-      ></path>
-    </svg>
-  </div>
+<div class="orb-button" id="agent-button" data-state="idle">
   
-  <!-- Listening state: waveform -->
-  <div class="waveform">
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-  </div>
-  
-  <!-- Speaking state: yellow orb container -->
-  <div class="orb-container">
-    <div class="orb orb-speaking">
-      <div class="orb-inner"></div>
-      <div class="orb-inner"></div>
+  <!-- State 1: IDLE (Blue Orb with Mic) -->
+  <div class="visual-layer idle-layer">
+    <div class="orb-simple">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M5 3a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0z"></path>
+        <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"></path>
+      </svg>
     </div>
   </div>
-</button>
+
+  <!-- State 2: LISTENING (Waveform) -->
+  <div class="visual-layer listening-layer">
+    <div class="waveform">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+  </div>
+
+  <!-- State 3: SPEAKING (Complex Orb from Uiverse) -->
+  <div class="visual-layer speaking-layer">
+    <div class="orb-container">
+      <div class="orb-uiverse">
+        <div class="orb-inner"></div>
+        <div class="orb-inner"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
 
 <script src="script.js"></script>
 </body>
