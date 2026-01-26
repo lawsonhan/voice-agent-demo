@@ -54,6 +54,15 @@
     transform 0.4s ease;
 }
 
+.orb-inner {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
 .waveform {
   position: absolute;
   bottom: 50%;
@@ -153,16 +162,108 @@
   }
 }
 
-#toggle:checked + .orb-button .orb svg {
+/* Listening state */
+#toggle:checked + .orb-button.state-listening .orb svg {
   opacity: 0;
   transform: scale(0.5);
 }
 
-#toggle:checked + .orb-button .orb {
+#toggle:checked + .orb-button.state-listening .orb {
   opacity: 0;
   transform: scale(0.2);
 }
 
-#toggle:checked + .orb-button .waveform {
+#toggle:checked + .orb-button.state-listening .waveform {
   opacity: 1;
+}
+
+#toggle:checked + .orb-button.state-listening .orb-inner {
+  opacity: 0;
+}
+
+/* Speaking state - Yellow orb */
+#toggle:checked + .orb-button.state-speaking .orb {
+  background: #060606;
+  filter: blur(24px);
+  opacity: 1;
+  transform: scale(1);
+  animation: orbRotate 6s infinite;
+  box-shadow: none;
+}
+
+#toggle:checked + .orb-button.state-speaking .orb svg {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+#toggle:checked + .orb-button.state-speaking .waveform {
+  opacity: 0;
+}
+
+#toggle:checked + .orb-button.state-speaking .orb-inner {
+  opacity: 1;
+  left: -120%;
+  top: -25%;
+  width: 160%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #ffd700;
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 91%,
+    50% 70%,
+    21% 91%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+  animation: rotateInner 6s linear infinite;
+}
+
+#toggle:checked + .orb-button.state-speaking .orb-inner:nth-child(2) {
+  left: auto;
+  right: -120%;
+  top: auto;
+  bottom: -25%;
+  background: #ffaa00;
+  animation-duration: 8s;
+  clip-path: polygon(
+    20% 0%,
+    0% 20%,
+    30% 50%,
+    0% 80%,
+    20% 100%,
+    50% 70%,
+    80% 100%,
+    100% 80%,
+    70% 50%,
+    100% 20%,
+    80% 0%,
+    50% 30%
+  );
+}
+
+.orb-button.state-speaking {
+  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.53)) drop-shadow(0 0 6px rgba(255, 170, 0, 0.53));
+}
+
+@keyframes orbRotate {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes rotateInner {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
