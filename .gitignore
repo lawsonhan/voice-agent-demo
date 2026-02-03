@@ -20,3 +20,6 @@ pip-delete-this-directory.txt
 
 # Project specific
 *.log
+
+# Environment files
+.env

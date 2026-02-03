@@ -1,48 +1,36 @@
-# Local AI Voice Agent Demo 🤖
+# External AI Voice Agent Demo
 
-A privacy-focused, fully local AI voice assistant featuring an expressive "Robot Eyes" UI. This project demonstrates how to build a voice agent using modern web technologies and local LLMs (Large Language Models) without relying on cloud APIs.
+A voice assistant demo featuring an expressive "Robot Eyes" UI and **fully external** AI services. This project uses Cantonese AI for speech-to-text and text-to-speech, plus Poe for LLM responses.
 
 ![Project Status](https://img.shields.io/badge/Status-Complete-success)
-![Tech Stack](https://img.shields.io/badge/Stack-Python%20%7C%20FastAPI%20%7C%20Ollama%20%7C%20JS-blue)
+![Tech Stack](https://img.shields.io/badge/Stack-Python%20%7C%20FastAPI%20%7C%20Cantonese%20AI%20%7C%20Poe%20%7C%20JS-blue)
 
 ## ✨ Features
 
-*   **100% Local Intelligence**: Powered by [Ollama](https://ollama.com/) running on your machine. No API keys required.
-*   **Expressive UI**: A "Robot Eyes" interface that changes shape and color based on state:
-    *   💙 **Idle**: Calm, static cyan eyes.
-    *   💚 **Listening**: Alert, round green eyes that pulse.
-    *   💜 **Processing**: Squinting purple eyes that scan side-to-side.
-    *   💛 **Speaking**: Happy, bouncing yellow eyes.
-*   **Full Voice Interaction**:
-    *   **STT (Ears)**: Uses browser-native Web Speech API for real-time transcription.
-    *   **LLM (Brain)**: Connects to a local Python backend to query the AI model.
-    *   **TTS (Mouth)**: Uses browser-native Speech Synthesis to read the response aloud.
-*   **Developer Controls**: Built-in buttons to manually test visual states.
+*   **External STT (Ears)**: Cantonese AI speech-to-text.
+*   **External LLM (Brain)**: Poe OpenAI-compatible chat completions.
+*   **External TTS (Mouth)**: Cantonese AI text-to-speech.
+*   **Expressive UI**: A "Robot Eyes" interface that changes shape and color based on state.
+*   **Developer Controls**: Buttons to manually test visual states.
 
 ## 🛠️ Architecture
 
 *   **Frontend**: HTML5, CSS3 (Animations), Vanilla JavaScript.
-*   **Backend**: Python (FastAPI) acting as a bridge between the browser and Ollama.
-*   **AI Engine**: Ollama (configured for `qwen3:1.7b`).
+*   **Backend**: Python (FastAPI) acting as a bridge to external APIs.
+*   **AI Services**:
+    *   Cantonese AI for STT/TTS.
+    *   Poe for LLM chat responses.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
 1.  **Python 3.8+** installed.
-2.  **[Ollama](https://ollama.com/)** installed and running.
-3.  A modern browser (Chrome, Edge, or Safari) for Web Speech API support.
+2.  **Cantonese AI API key**.
+3.  **Poe API key**.
+4.  A modern browser (Chrome/Edge recommended) with **OGG/WAV MediaRecorder** support.
 
-### 1. Setup AI Model (Ollama)
-
-Ensure Ollama is running and pull the model configured in the backend (default: `qwen3:1.7b`).
-
-```bash
-# Pull the model
-ollama pull qwen3:1.7b
-```
-
-### 2. Setup Backend
+### 1. Setup Backend
 
 Navigate to the project root and set up the Python environment.
 
@@ -57,13 +45,34 @@ source venv/bin/activate
 
 # 3. Install dependencies
 pip install -r backend/requirements.txt
+```
 
-# 4. Start the backend server
+### 2. Configure Environment Variables
+
+Set the required API keys (and optional settings) before starting the backend:
+
+```bash
+# Required
+export CANTONESE_API_KEY="your_cantonese_api_key"
+export POE_API_KEY="your_poe_api_key"
+
+# Optional
+export POE_MODEL="Claude-Sonnet-4"
+export CANTONESE_TTS_VOICE_ID=""
+export CANTONESE_TTS_OUTPUT="mp3"   # mp3 | wav
+export CANTONESE_TTS_LANGUAGE="cantonese"
+export CANTONESE_TTS_FRAME_RATE="24000"
+export CANTONESE_TTS_SPEED="1.0"
+```
+
+### 3. Start Backend
+
+```bash
 python backend/main.py
 ```
 *The backend runs on `http://localhost:8000`.*
 
-### 3. Run Frontend
+### 4. Run Frontend
 
 Since this project uses microphone permissions, it's best served via a local web server rather than opening `index.html` directly.
 
@@ -79,13 +88,14 @@ Right-click `index.html` and select "Open with Live Server".
 
 ## 🎮 Usage
 
-1.  **Click the Robot Face** (or the screen) to wake the agent.
-2.  **Speak** your query clearly (e.g., "Hello, who are you?").
-3.  The agent will:
+1.  **Click the Robot Face** to start recording.
+2.  **Speak** your query clearly.
+3.  Click again to stop recording (or wait for the timeout).
+4.  The agent will:
     *   **Listen** (Green Eyes)
     *   **Think** (Purple Eyes)
-    *   **Speak** the answer (Yellow Eyes)
-4.  **Interrupt**: Click the screen again while it's speaking to stop it.
+    *   **Speak** (Yellow Eyes)
+5.  **Interrupt**: Click again while it’s speaking to stop playback.
 
 ## 📂 Project Structure
 
@@ -98,18 +108,19 @@ voice-agent-demo/
 ├── README.md            # Documentation
 └── backend/             # Python Backend
     ├── main.py          # FastAPI application entry point
-    ├── services.py      # Logic to communicate with Ollama
+    ├── services.py      # API integrations (Cantonese AI + Poe)
     └── requirements.txt # Python dependencies
 ```
 
 ## ⚙️ Configuration
 
-*   **Change AI Model**: Edit `MODEL_NAME` in `backend/services.py`.
-*   **Adjust Timeout**: Edit `startListeningTimer` duration in `script.js` (default: 5000ms).
-*   **Change Voice**: Edit `utterance.voice` in the `speak()` function in `script.js`.
+*   **Change LLM model**: Edit `POE_MODEL` env var (see Poe model list).
+*   **Change voice**: Edit `CANTONESE_TTS_VOICE_ID` env var.
+*   **Adjust timeout**: Edit `RECORDING_TIMEOUT_MS` in `script.js`.
 
 ## 🤝 Troubleshooting
 
-*   **"Backend Error"**: Ensure the Python server is running (`python backend/main.py`) and Ollama is running (`ollama serve`).
-*   **Microphone not working**: Ensure you are accessing via `localhost` or `https`. Check browser permissions.
+*   **"Backend error" / "STT error" / "TTS error"**: Ensure the Python server is running and API keys are set.
+*   **Microphone not working**: Ensure you are accessing via `localhost` or `https` and granted mic permissions.
 *   **No Audio Output**: Check system volume and ensure the browser tab isn't muted.
+*   **Recording format error**: Use Chrome/Edge so MediaRecorder can produce OGG/WAV files.
