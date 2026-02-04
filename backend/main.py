@@ -1,18 +1,15 @@
 import io
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from services import (
-    UpstreamServiceError,
-    query_poe,
-    transcribe_audio,
-    synthesize_speech,
-)
+from recorder import BackendRecorder, RecorderError
+from services import UpstreamServiceError, query_poe, transcribe_audio, synthesize_speech
 
 app = FastAPI()
+recorder = BackendRecorder()
 
 # Enable CORS so our frontend (which might run on a different port or file://) can query this API
 app.add_middleware(
@@ -38,6 +35,10 @@ class TTSRequest(BaseModel):
 
 class STTResponse(BaseModel):
     text: str
+
+
+class RecordResponse(BaseModel):
+    status: str
 
 
 @app.get("/")
@@ -76,6 +77,41 @@ async def stt_endpoint(audio: UploadFile = File(...)):
 
     try:
         text = await transcribe_audio(audio_bytes, audio.filename or "audio.ogg", audio.content_type)
+    except UpstreamServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return STTResponse(text=text)
+
+
+@app.post("/record/start", response_model=RecordResponse)
+async def start_recording():
+    try:
+        recorder.start()
+    except RecorderError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to start recording") from exc
+
+    return RecordResponse(status="recording")
+
+
+@app.post("/record/stop", response_model=STTResponse)
+async def stop_recording(
+    wait_for_silence: bool = Query(True, description="Wait for silence before stopping"),
+    max_duration: float = Query(5.0, description="Max seconds to wait for silence"),
+):
+    try:
+        if wait_for_silence:
+            audio_bytes = recorder.stop_when_silent(max_duration=max_duration)
+        else:
+            audio_bytes = recorder.stop()
+    except RecorderError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to stop recording") from exc
+
+    try:
+        text = await transcribe_audio(audio_bytes, "recording.wav", "audio/wav")
     except UpstreamServiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

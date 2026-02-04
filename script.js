@@ -6,11 +6,6 @@ const STATES = {
 };
 
 const RECORDING_TIMEOUT_MS = 5000;
-const SUPPORTED_RECORDING_TYPES = [
-    'audio/ogg;codecs=opus',
-    'audio/ogg',
-    'audio/wav'
-];
 
 class VoiceAgent {
     constructor(elementId) {
@@ -19,16 +14,12 @@ class VoiceAgent {
         this.state = STATES.IDLE;
         this.listeningTimer = null;
 
-        this.mediaStream = null;
-        this.mediaRecorder = null;
-        this.recordedChunks = [];
-        this.ignoreNextRecording = false;
-
         this.audio = null;
         this.fetchController = null;
 
         this.chatUrl = 'http://localhost:8000/chat';
-        this.sttUrl = 'http://localhost:8000/stt';
+        this.recordStartUrl = 'http://localhost:8000/record/start';
+        this.recordStopUrl = 'http://localhost:8000/record/stop?wait_for_silence=true';
         this.ttsUrl = 'http://localhost:8000/tts';
 
         this.element.addEventListener('click', () => {
@@ -36,22 +27,6 @@ class VoiceAgent {
                 console.error('Interaction error:', error);
             });
         });
-    }
-
-    getSupportedMimeType() {
-        if (!window.MediaRecorder) return '';
-        for (const type of SUPPORTED_RECORDING_TYPES) {
-            if (MediaRecorder.isTypeSupported(type)) {
-                return type;
-            }
-        }
-        return '';
-    }
-
-    getFileExtension(mimeType) {
-        if (mimeType.includes('ogg')) return 'ogg';
-        if (mimeType.includes('wav')) return 'wav';
-        return 'audio';
     }
 
     async handleInteraction() {
@@ -71,71 +46,37 @@ class VoiceAgent {
     }
 
     async startListening() {
-        const mimeType = this.getSupportedMimeType();
-        if (!mimeType) {
-            this.updateTranscript('Browser does not support OGG/WAV recording.');
-            return;
-        }
-
         this.cancelActiveWork();
         this.transitionTo(STATES.LISTENING);
-        this.updateTranscript('Listening...');
+        this.updateTranscript('Listening (backend recording)...');
 
         try {
-            if (!this.mediaStream) {
-                this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const controller = this.createAbortController();
+            const response = await fetch(this.recordStartUrl, {
+                method: 'POST',
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                throw new Error('Backend recording start failed');
             }
 
-            this.recordedChunks = [];
-            this.ignoreNextRecording = false;
-
-            this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType });
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    this.recordedChunks.push(event.data);
-                }
-            };
-
-            this.mediaRecorder.onstop = () => {
-                this.handleRecordingStop(mimeType).catch((error) => {
-                    console.error('Recording stop error:', error);
-                });
-            };
-
-            this.mediaRecorder.start();
             this.startListeningTimer();
         } catch (error) {
-            console.error('Microphone error:', error);
-            this.updateTranscript('Microphone access denied.');
+            if (error.name === 'AbortError') return;
+            console.error('Recording start error:', error);
+            this.updateTranscript('Recording start failed.');
             this.transitionTo(STATES.IDLE);
+        } finally {
+            this.clearAbortController();
         }
     }
 
     stopListening() {
         this.clearListeningTimer();
-
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            this.mediaRecorder.stop();
-        }
-    }
-
-    async handleRecordingStop(mimeType) {
-        this.clearListeningTimer();
-
-        if (this.ignoreNextRecording) {
-            this.ignoreNextRecording = false;
-            return;
-        }
-
-        if (!this.recordedChunks.length) {
-            this.updateTranscript('No speech detected.');
-            this.transitionTo(STATES.IDLE);
-            return;
-        }
-
-        const blob = new Blob(this.recordedChunks, { type: mimeType });
-        await this.sendForTranscription(blob, mimeType);
+        this.stopBackendRecording().catch((error) => {
+            console.error('Recording stop error:', error);
+        });
     }
 
     startListeningTimer() {
@@ -177,25 +118,20 @@ class VoiceAgent {
         this.fetchController = null;
     }
 
-    async sendForTranscription(blob, mimeType) {
+    async stopBackendRecording() {
         this.transitionTo(STATES.PROCESSING);
         this.updateTranscript('Transcribing...');
-
-        const formData = new FormData();
-        const extension = this.getFileExtension(mimeType);
-        formData.append('audio', blob, `recording.${extension}`);
 
         const controller = this.createAbortController();
 
         try {
-            const response = await fetch(this.sttUrl, {
+            const response = await fetch(this.recordStopUrl, {
                 method: 'POST',
-                body: formData,
                 signal: controller.signal
             });
 
             if (!response.ok) {
-                throw new Error('STT backend error');
+                throw new Error('Backend recording stop failed');
             }
 
             const data = await response.json();
@@ -315,11 +251,6 @@ class VoiceAgent {
     }
 
     cancelActiveWork() {
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            this.ignoreNextRecording = true;
-            this.mediaRecorder.stop();
-        }
-
         if (this.fetchController) {
             this.fetchController.abort();
             this.fetchController = null;

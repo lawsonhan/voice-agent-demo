@@ -7,16 +7,17 @@ A voice assistant demo featuring an expressive "Robot Eyes" UI and **fully exter
 
 ## ✨ Features
 
-*   **External STT (Ears)**: Cantonese AI speech-to-text.
+*   **External STT (Ears)**: Cantonese AI speech-to-text (recorded on backend).
 *   **External LLM (Brain)**: Poe OpenAI-compatible chat completions.
 *   **External TTS (Mouth)**: Cantonese AI text-to-speech.
 *   **Expressive UI**: A "Robot Eyes" interface that changes shape and color based on state.
 *   **Developer Controls**: Buttons to manually test visual states.
+*   **Backend Recording**: Stops recording after brief silence detection on the server.
 
 ## 🛠️ Architecture
 
 *   **Frontend**: HTML5, CSS3 (Animations), Vanilla JavaScript.
-*   **Backend**: Python (FastAPI) acting as a bridge to external APIs.
+*   **Backend**: Python (FastAPI) acting as a bridge to external APIs and handling audio recording.
 *   **AI Services**:
     *   Cantonese AI for STT/TTS.
     *   Poe for LLM chat responses.
@@ -28,7 +29,7 @@ A voice assistant demo featuring an expressive "Robot Eyes" UI and **fully exter
 1.  **Python 3.8+** installed.
 2.  **Cantonese AI API key**.
 3.  **Poe API key**.
-4.  A modern browser (Chrome/Edge recommended) with **OGG/WAV MediaRecorder** support.
+4.  A machine with a microphone accessible to the backend server (backend records audio).
 
 ### 1. Setup Backend
 
@@ -74,7 +75,7 @@ python backend/main.py
 
 ### 4. Run Frontend
 
-Since this project uses microphone permissions, it's best served via a local web server rather than opening `index.html` directly.
+Since this project uses browser audio playback, it's best served via a local web server rather than opening `index.html` directly.
 
 **Option A: Using Python (Simplest)**
 Open a new terminal window in the project root:
@@ -88,8 +89,8 @@ Right-click `index.html` and select "Open with Live Server".
 
 ## 🎮 Usage
 
-1.  **Click the Robot Face** to start recording.
-2.  **Speak** your query clearly.
+1.  **Click the Robot Face** to start recording (backend microphone).
+2.  **Speak** your query clearly near the machine running the backend.
 3.  Click again to stop recording (or wait for the timeout).
 4.  The agent will:
     *   **Listen** (Green Eyes)
@@ -121,6 +122,5 @@ voice-agent-demo/
 ## 🤝 Troubleshooting
 
 *   **"Backend error" / "STT error" / "TTS error"**: Ensure the Python server is running and API keys are set.
-*   **Microphone not working**: Ensure you are accessing via `localhost` or `https` and granted mic permissions.
+*   **Microphone not working**: Ensure the backend host has a microphone and permissions to access it.
 *   **No Audio Output**: Check system volume and ensure the browser tab isn't muted.
-*   **Recording format error**: Use Chrome/Edge so MediaRecorder can produce OGG/WAV files.
