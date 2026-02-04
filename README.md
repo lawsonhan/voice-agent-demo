@@ -1,126 +1,61 @@
 # External AI Voice Agent Demo
 
-A voice assistant demo featuring an expressive "Robot Eyes" UI and **fully external** AI services. This project uses Cantonese AI for speech-to-text and text-to-speech, plus Poe for LLM responses.
+A simple teaching/demo voice assistant with an expressive "Robot Eyes" UI.
 
-![Project Status](https://img.shields.io/badge/Status-Complete-success)
-![Tech Stack](https://img.shields.io/badge/Stack-Python%20%7C%20FastAPI%20%7C%20Cantonese%20AI%20%7C%20Poe%20%7C%20JS-blue)
+- STT: Cantonese AI (supports Cantonese)
+- LLM: Poe (`/v1/chat/completions` compatible)
+- TTS: Cantonese AI
 
-## ✨ Features
+## How It Works
 
-*   **External STT (Ears)**: Cantonese AI speech-to-text (recorded on backend).
-*   **External LLM (Brain)**: Poe OpenAI-compatible chat completions.
-*   **External TTS (Mouth)**: Cantonese AI text-to-speech.
-*   **Expressive UI**: A "Robot Eyes" interface that changes shape and color based on state.
-*   **Developer Controls**: Buttons to manually test visual states.
-*   **Backend Recording**: Stops recording after brief silence detection on the server.
+1. Browser records microphone audio and encodes it as `wav`.
+2. Backend sends audio to Cantonese AI STT.
+3. Backend sends the transcript to Poe.
+4. Backend sends the reply text to Cantonese AI TTS.
+5. Browser plays the returned audio.
 
-## 🛠️ Architecture
+## Requirements
 
-*   **Frontend**: HTML5, CSS3 (Animations), Vanilla JavaScript.
-*   **Backend**: Python (FastAPI) acting as a bridge to external APIs and handling audio recording.
-*   **AI Services**:
-    *   Cantonese AI for STT/TTS.
-    *   Poe for LLM chat responses.
+- Python 3.8+
+- Chrome (recommended)
+- No extra system software required (no ffmpeg).
+- API keys:
+  - `CANTONESE_API_KEY`
+  - `POE_API_KEY`
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-1.  **Python 3.8+** installed.
-2.  **Cantonese AI API key**.
-3.  **Poe API key**.
-4.  A machine with a microphone accessible to the backend server (backend records audio).
-
-### 1. Setup Backend
-
-Navigate to the project root and set up the Python environment.
+## Setup
 
 ```bash
-# 1. Create a virtual environment
 python3 -m venv venv
-
-# 2. Activate it (macOS/Linux)
 source venv/bin/activate
-# OR (Windows)
-# venv\Scripts\activate
-
-# 3. Install dependencies
 pip install -r backend/requirements.txt
+
+cp .env.example .env
+# edit .env
 ```
 
-### 2. Configure Environment Variables
+## Run
 
-Set the required API keys (and optional settings) before starting the backend:
-
+Backend:
 ```bash
-# Required
-export CANTONESE_API_KEY="your_cantonese_api_key"
-export POE_API_KEY="your_poe_api_key"
-
-# Optional
-export POE_MODEL="Claude-Sonnet-4"
-export CANTONESE_TTS_VOICE_ID=""
-export CANTONESE_TTS_OUTPUT="mp3"   # mp3 | wav
-export CANTONESE_TTS_LANGUAGE="cantonese"
-export CANTONESE_TTS_FRAME_RATE="24000"
-export CANTONESE_TTS_SPEED="1.0"
+python3 backend/main.py
 ```
 
-### 3. Start Backend
-
-```bash
-python backend/main.py
-```
-*The backend runs on `http://localhost:8000`.*
-
-### 4. Run Frontend
-
-Since this project uses browser audio playback, it's best served via a local web server rather than opening `index.html` directly.
-
-**Option A: Using Python (Simplest)**
-Open a new terminal window in the project root:
+Frontend:
 ```bash
 python -m http.server 3000
 ```
-Then open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
-**Option B: VS Code Live Server**
-Right-click `index.html` and select "Open with Live Server".
+Open `http://localhost:3000`.
 
-## 🎮 Usage
+## Usage
 
-1.  **Click the Robot Face** to start recording (backend microphone).
-2.  **Speak** your query clearly near the machine running the backend.
-3.  Click again to stop recording (or wait for the timeout).
-4.  The agent will:
-    *   **Listen** (Green Eyes)
-    *   **Think** (Purple Eyes)
-    *   **Speak** (Yellow Eyes)
-5.  **Interrupt**: Click again while it’s speaking to stop playback.
+- Click the face to start recording.
+- Click again to stop (or wait for silence/timeout).
+- The agent will transcribe, reply, and speak.
 
-## 📂 Project Structure
+## Notes
 
-```text
-voice-agent-demo/
-├── index.html           # Main UI structure
-├── style.css            # Robot eyes animations and styling
-├── script.js            # Frontend logic (State machine, STT/TTS, API calls)
-├── .gitignore           # Git ignore rules
-├── README.md            # Documentation
-└── backend/             # Python Backend
-    ├── main.py          # FastAPI application entry point
-    ├── services.py      # API integrations (Cantonese AI + Poe)
-    └── requirements.txt # Python dependencies
-```
-
-## ⚙️ Configuration
-
-*   **Change LLM model**: Edit `POE_MODEL` env var (see Poe model list).
-*   **Change voice**: Edit `CANTONESE_TTS_VOICE_ID` env var.
-*   **Adjust timeout**: Edit `RECORDING_TIMEOUT_MS` in `script.js`.
-
-## 🤝 Troubleshooting
-
-*   **"Backend error" / "STT error" / "TTS error"**: Ensure the Python server is running and API keys are set.
-*   **Microphone not working**: Ensure the backend host has a microphone and permissions to access it.
-*   **No Audio Output**: Check system volume and ensure the browser tab isn't muted.
+- `.env` is auto-loaded by the backend (via `python-dotenv`).
+- If STT/TTS fails, check backend logs and confirm API keys in `.env`.
+- See `structure.md` for a detailed explanation of the code structure (香港繁體中文).
