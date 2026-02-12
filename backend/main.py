@@ -1,21 +1,28 @@
 import io
+import logging
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from recorder import BackendRecorder, RecorderError
-from services import UpstreamServiceError, query_poe, transcribe_audio, synthesize_speech
+from services import UpstreamServiceError, query_poe, synthesize_speech, transcribe_audio
 
-app = FastAPI()
-recorder = BackendRecorder()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(PROJECT_ROOT / ".env")
+
+logger = logging.getLogger("voice-agent-demo")
+logging.basicConfig(level=logging.INFO)
+
+app = FastAPI(title="Voice Agent Backend")
 
 # Enable CORS so our frontend (which might run on a different port or file://) can query this API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # For local demo, allow all. In prod, lock this down.
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -37,81 +44,47 @@ class STTResponse(BaseModel):
     text: str
 
 
-class RecordResponse(BaseModel):
+class StatusResponse(BaseModel):
     status: str
 
 
 @app.get("/")
-def read_root():
-    return {"status": "Voice Agent Backend is running"}
+def read_root() -> StatusResponse:
+    return StatusResponse(status="Voice Agent Backend is running")
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(request: ChatRequest) -> ChatResponse:
     """
     Receives text from frontend, queries Poe, returns AI text reply.
     """
     if not request.message:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    print(f"User said: {request.message}")
+    logger.info("User said: %s", request.message)
 
     try:
         ai_reply = await query_poe(request.message)
     except UpstreamServiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    print(f"AI replied: {ai_reply}")
+    logger.info("AI replied: %s", ai_reply)
 
     return ChatResponse(reply=ai_reply)
 
 
 @app.post("/stt", response_model=STTResponse)
-async def stt_endpoint(audio: UploadFile = File(...)):
-    if not audio:
-        raise HTTPException(status_code=400, detail="Audio file is required")
-
+async def stt_endpoint(audio: UploadFile = File(...)) -> STTResponse:
     audio_bytes = await audio.read()
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Audio file is empty")
 
     try:
-        text = await transcribe_audio(audio_bytes, audio.filename or "audio.ogg", audio.content_type)
-    except UpstreamServiceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    return STTResponse(text=text)
-
-
-@app.post("/record/start", response_model=RecordResponse)
-async def start_recording():
-    try:
-        recorder.start()
-    except RecorderError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail="Failed to start recording") from exc
-
-    return RecordResponse(status="recording")
-
-
-@app.post("/record/stop", response_model=STTResponse)
-async def stop_recording(
-    wait_for_silence: bool = Query(True, description="Wait for silence before stopping"),
-    max_duration: float = Query(5.0, description="Max seconds to wait for silence"),
-):
-    try:
-        if wait_for_silence:
-            audio_bytes = recorder.stop_when_silent(max_duration=max_duration)
-        else:
-            audio_bytes = recorder.stop()
-    except RecorderError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail="Failed to stop recording") from exc
-
-    try:
-        text = await transcribe_audio(audio_bytes, "recording.wav", "audio/wav")
+        text = await transcribe_audio(
+            audio_bytes,
+            audio.filename or "audio.wav",
+            audio.content_type,
+        )
     except UpstreamServiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -119,7 +92,7 @@ async def stop_recording(
 
 
 @app.post("/tts")
-async def tts_endpoint(request: TTSRequest):
+async def tts_endpoint(request: TTSRequest) -> StreamingResponse:
     if not request.text:
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
@@ -135,4 +108,4 @@ if __name__ == "__main__":
     import uvicorn
 
     # Run server on localhost:8000
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -20,12 +20,13 @@
 <div id="transcript" class="transcript-display"></div>
 
 <div id="dev-controls">
-  <button class="dev-btn" onclick="agent.transitionTo('idle')">Idle</button>
-  <button class="dev-btn" onclick="agent.transitionTo('listening')">Listening</button>
-  <button class="dev-btn" onclick="agent.transitionTo('processing')">Processing</button>
-  <button class="dev-btn" onclick="agent.transitionTo('speaking')">Speaking</button>
+  <button class="dev-btn" data-state="idle">Idle</button>
+  <button class="dev-btn" data-state="listening">Listening</button>
+  <button class="dev-btn" data-state="processing">Processing</button>
+  <button class="dev-btn" data-state="speaking">Speaking</button>
 </div>
 
+<script src="wav-recorder.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
