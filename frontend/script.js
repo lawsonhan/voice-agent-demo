@@ -17,10 +17,17 @@ class VoiceAgent {
         this.audio = null;
         this.fetchController = null;
 
-        this.chatUrl = 'http://localhost:8000/chat';
-        this.recordStartUrl = 'http://localhost:8000/record/start';
-        this.recordStopUrl = 'http://localhost:8000/record/stop?wait_for_silence=true';
-        this.ttsUrl = 'http://localhost:8000/tts';
+        this.chatUrl = '/api/chat';
+        this.sttUrl = '/api/stt';
+        this.ttsUrl = '/api/tts';
+
+        // Browser mic recording
+        this.mediaStream = null;
+        this.audioContext = null;
+        this.sourceNode = null;
+        this.processorNode = null;
+        this.recordedChunks = [];
+        this.recordingSampleRate = 48000;
 
         this.element.addEventListener('click', () => {
             this.handleInteraction().catch((error) => {
@@ -48,33 +55,21 @@ class VoiceAgent {
     async startListening() {
         this.cancelActiveWork();
         this.transitionTo(STATES.LISTENING);
-        this.updateTranscript('Listening (backend recording)...');
+        this.updateTranscript('Listening (browser mic)...');
 
         try {
-            const controller = this.createAbortController();
-            const response = await fetch(this.recordStartUrl, {
-                method: 'POST',
-                signal: controller.signal
-            });
-
-            if (!response.ok) {
-                throw new Error('Backend recording start failed');
-            }
-
+            await this.startBrowserRecording();
             this.startListeningTimer();
         } catch (error) {
-            if (error.name === 'AbortError') return;
             console.error('Recording start error:', error);
             this.updateTranscript('Recording start failed.');
             this.transitionTo(STATES.IDLE);
-        } finally {
-            this.clearAbortController();
         }
     }
 
     stopListening() {
         this.clearListeningTimer();
-        this.stopBackendRecording().catch((error) => {
+        this.stopBrowserRecordingAndTranscribe().catch((error) => {
             console.error('Recording stop error:', error);
         });
     }
@@ -118,24 +113,15 @@ class VoiceAgent {
         this.fetchController = null;
     }
 
-    async stopBackendRecording() {
+    async stopBrowserRecordingAndTranscribe() {
         this.transitionTo(STATES.PROCESSING);
         this.updateTranscript('Transcribing...');
 
         const controller = this.createAbortController();
 
         try {
-            const response = await fetch(this.recordStopUrl, {
-                method: 'POST',
-                signal: controller.signal
-            });
-
-            if (!response.ok) {
-                throw new Error('Backend recording stop failed');
-            }
-
-            const data = await response.json();
-            const text = (data.text || '').trim();
+            const wavBlob = await this.stopBrowserRecording();
+            const text = await this.transcribeAudioBlob(wavBlob, controller.signal);
 
             if (!text) {
                 this.updateTranscript('No speech recognized.');
@@ -153,6 +139,171 @@ class VoiceAgent {
         } finally {
             this.clearAbortController();
         }
+    }
+
+    async startBrowserRecording() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('getUserMedia not supported');
+        }
+
+        await this.forceStopBrowserRecording();
+        this.recordedChunks = [];
+
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.recordingSampleRate = this.audioContext.sampleRate;
+
+        this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+        // ScriptProcessor is deprecated but broadly supported and fine for this demo.
+        this.processorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
+
+        this.processorNode.onaudioprocess = (event) => {
+            const input = event.inputBuffer.getChannelData(0);
+            this.recordedChunks.push(new Float32Array(input));
+        };
+
+        this.sourceNode.connect(this.processorNode);
+        this.processorNode.connect(this.audioContext.destination);
+    }
+
+    async forceStopBrowserRecording() {
+        try {
+            if (this.processorNode) {
+                this.processorNode.disconnect();
+                this.processorNode.onaudioprocess = null;
+            }
+        } catch (_) {}
+
+        try {
+            if (this.sourceNode) {
+                this.sourceNode.disconnect();
+            }
+        } catch (_) {}
+
+        if (this.mediaStream) {
+            for (const track of this.mediaStream.getTracks()) {
+                try { track.stop(); } catch (_) {}
+            }
+        }
+
+        if (this.audioContext) {
+            try { await this.audioContext.close(); } catch (_) {}
+        }
+
+        this.mediaStream = null;
+        this.audioContext = null;
+        this.sourceNode = null;
+        this.processorNode = null;
+    }
+
+    async stopBrowserRecording() {
+        if (!this.mediaStream || !this.audioContext) {
+            throw new Error('Recording has not been started');
+        }
+
+        await this.forceStopBrowserRecording();
+
+        const samples = this.flattenFloat32Chunks(this.recordedChunks);
+        this.recordedChunks = [];
+
+        if (!samples || samples.length === 0) {
+            throw new Error('No audio captured');
+        }
+
+        const targetRate = 16000;
+        const downsampled = this.downsampleBuffer(samples, this.recordingSampleRate, targetRate);
+        const wavArrayBuffer = this.encodeWavPcm16(downsampled, targetRate);
+        return new Blob([wavArrayBuffer], { type: 'audio/wav' });
+    }
+
+    flattenFloat32Chunks(chunks) {
+        let totalLength = 0;
+        for (const chunk of chunks) totalLength += chunk.length;
+        const result = new Float32Array(totalLength);
+        let offset = 0;
+        for (const chunk of chunks) {
+            result.set(chunk, offset);
+            offset += chunk.length;
+        }
+        return result;
+    }
+
+    downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
+        if (outputSampleRate >= inputSampleRate) return buffer;
+        const sampleRateRatio = inputSampleRate / outputSampleRate;
+        const newLength = Math.round(buffer.length / sampleRateRatio);
+        const result = new Float32Array(newLength);
+        let offsetResult = 0;
+        let offsetBuffer = 0;
+        while (offsetResult < result.length) {
+            const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+            let accum = 0;
+            let count = 0;
+            for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+                accum += buffer[i];
+                count++;
+            }
+            result[offsetResult] = count > 0 ? accum / count : 0;
+            offsetResult++;
+            offsetBuffer = nextOffsetBuffer;
+        }
+        return result;
+    }
+
+    encodeWavPcm16(floatSamples, sampleRate) {
+        const bytesPerSample = 2;
+        const blockAlign = 1 * bytesPerSample;
+        const buffer = new ArrayBuffer(44 + floatSamples.length * bytesPerSample);
+        const view = new DataView(buffer);
+
+        this.writeAscii(view, 0, 'RIFF');
+        view.setUint32(4, 36 + floatSamples.length * bytesPerSample, true);
+        this.writeAscii(view, 8, 'WAVE');
+
+        this.writeAscii(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * blockAlign, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, 16, true);
+
+        this.writeAscii(view, 36, 'data');
+        view.setUint32(40, floatSamples.length * bytesPerSample, true);
+
+        let offset = 44;
+        for (let i = 0; i < floatSamples.length; i++, offset += 2) {
+            let sample = Math.max(-1, Math.min(1, floatSamples[i]));
+            sample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+            view.setInt16(offset, sample, true);
+        }
+
+        return buffer;
+    }
+
+    writeAscii(view, offset, text) {
+        for (let i = 0; i < text.length; i++) {
+            view.setUint8(offset + i, text.charCodeAt(i));
+        }
+    }
+
+    async transcribeAudioBlob(audioBlob, signal) {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.wav');
+
+        const response = await fetch(this.sttUrl, {
+            method: 'POST',
+            body: formData,
+            signal
+        });
+
+        if (!response.ok) {
+            throw new Error('STT backend error');
+        }
+
+        const data = await response.json();
+        return (data.text || '').trim();
     }
 
     async processUserInput(text) {
@@ -252,9 +403,12 @@ class VoiceAgent {
 
     cancelActiveWork() {
         if (this.fetchController) {
-            this.fetchController.abort();
-            this.fetchController = null;
+            try { this.fetchController.abort(); } catch (_) {}
         }
+        this.fetchController = null;
+
+        // Stop mic capture if active
+        this.forceStopBrowserRecording().catch(() => {});
 
         if (this.audio) {
             this.audio.pause();

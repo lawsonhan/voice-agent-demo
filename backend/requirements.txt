@@ -3,5 +3,3 @@ uvicorn
 httpx
 pydantic
 python-multipart
-numpy
-sounddevice

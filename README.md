@@ -7,17 +7,17 @@ A voice assistant demo featuring an expressive "Robot Eyes" UI and **fully exter
 
 ## ✨ Features
 
-*   **External STT (Ears)**: Cantonese AI speech-to-text (recorded on backend).
+*   **External STT (Ears)**: Cantonese AI speech-to-text (recorded in the browser and uploaded).
 *   **External LLM (Brain)**: Poe OpenAI-compatible chat completions.
 *   **External TTS (Mouth)**: Cantonese AI text-to-speech.
 *   **Expressive UI**: A "Robot Eyes" interface that changes shape and color based on state.
 *   **Developer Controls**: Buttons to manually test visual states.
-*   **Backend Recording**: Stops recording after brief silence detection on the server.
+*   **Browser Recording**: Records from the user's microphone via `getUserMedia`.
 
 ## 🛠️ Architecture
 
 *   **Frontend**: HTML5, CSS3 (Animations), Vanilla JavaScript.
-*   **Backend**: Python (FastAPI) acting as a bridge to external APIs and handling audio recording.
+*   **Backend**: Python (FastAPI) acting as a bridge to external APIs.
 *   **AI Services**:
     *   Cantonese AI for STT/TTS.
     *   Poe for LLM chat responses.
@@ -29,7 +29,6 @@ A voice assistant demo featuring an expressive "Robot Eyes" UI and **fully exter
 1.  **Python 3.8+** installed.
 2.  **Cantonese AI API key**.
 3.  **Poe API key**.
-4.  A machine with a microphone accessible to the backend server (backend records audio).
 
 ### 1. Setup Backend
 
@@ -71,26 +70,12 @@ export CANTONESE_TTS_SPEED="1.0"
 ```bash
 python backend/main.py
 ```
-*The backend runs on `http://localhost:8000`.*
-
-### 4. Run Frontend
-
-Since this project uses browser audio playback, it's best served via a local web server rather than opening `index.html` directly.
-
-**Option A: Using Python (Simplest)**
-Open a new terminal window in the project root:
-```bash
-python -m http.server 3000
-```
-Then open **[http://localhost:3000](http://localhost:3000)** in your browser.
-
-**Option B: VS Code Live Server**
-Right-click `index.html` and select "Open with Live Server".
+Then open `http://localhost:8000` in your browser and allow microphone access.
 
 ## 🎮 Usage
 
-1.  **Click the Robot Face** to start recording (backend microphone).
-2.  **Speak** your query clearly near the machine running the backend.
+1.  **Click the Robot Face** to start recording (browser microphone).
+2.  **Speak** your query clearly.
 3.  Click again to stop recording (or wait for the timeout).
 4.  The agent will:
     *   **Listen** (Green Eyes)
@@ -102,15 +87,28 @@ Right-click `index.html` and select "Open with Live Server".
 
 ```text
 voice-agent-demo/
-├── index.html           # Main UI structure
-├── style.css            # Robot eyes animations and styling
-├── script.js            # Frontend logic (State machine, STT/TTS, API calls)
+├── frontend/            # Static UI (served by backend)
+│   ├── index.html       # Main UI structure
+│   ├── style.css        # Robot eyes animations and styling
+│   └── script.js        # Frontend logic (State machine, STT/TTS, API calls)
 ├── .gitignore           # Git ignore rules
 ├── README.md            # Documentation
 └── backend/             # Python Backend
     ├── main.py          # FastAPI application entry point
     ├── services.py      # API integrations (Cantonese AI + Poe)
     └── requirements.txt # Python dependencies
+```
+
+## ☁️ Deploy (Cloud Run)
+
+This repo includes a `Dockerfile` that serves both the frontend and backend from one Cloud Run service.
+
+```bash
+gcloud run deploy voice-agent-demo \
+  --source . \
+  --region YOUR_REGION \
+  --allow-unauthenticated \
+  --set-env-vars CANTONESE_API_KEY=...,POE_API_KEY=...
 ```
 
 ## ⚙️ Configuration

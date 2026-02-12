@@ -111,6 +111,7 @@ async def transcribe_audio(
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(CANTONESE_STT_URL, data=data, files=files)
+            print(f"[DEBUG STT] status={response.status_code} body={response.text[:500]}")
             response.raise_for_status()
             payload = response.json()
     except httpx.HTTPError as exc:
