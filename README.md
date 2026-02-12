@@ -36,17 +36,28 @@ cp .env.example .env
 
 ## Run
 
-Backend:
 ```bash
 python3 backend/main.py
 ```
 
-Frontend:
-```bash
-python -m http.server 3000
-```
+Open `http://localhost:8000`.
 
-Open `http://localhost:3000`.
+## Deploy (Cloud Run)
+
+This repo includes a `Dockerfile` that serves both the frontend and backend from one Cloud Run service.
+
+Required environment variables:
+- `CANTONESE_API_KEY`
+- `POE_API_KEY`
+
+Example (CLI):
+```bash
+gcloud run deploy voice-agent-demo \
+  --source . \
+  --region YOUR_REGION \
+  --allow-unauthenticated \
+  --set-env-vars CANTONESE_API_KEY=...,POE_API_KEY=...
+```
 
 ## Usage
 

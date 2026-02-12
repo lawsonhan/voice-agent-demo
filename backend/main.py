@@ -1,14 +1,16 @@
 import io
 import logging
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from services import UpstreamServiceError, query_poe, synthesize_speech, transcribe_audio
+from backend.services import UpstreamServiceError, query_poe, synthesize_speech, transcribe_audio
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
@@ -48,12 +50,17 @@ class StatusResponse(BaseModel):
     status: str
 
 
-@app.get("/")
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
+
+
+@app.get("/api/status")
 def read_root() -> StatusResponse:
     return StatusResponse(status="Voice Agent Backend is running")
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest) -> ChatResponse:
     """
     Receives text from frontend, queries Poe, returns AI text reply.
@@ -73,7 +80,7 @@ async def chat_endpoint(request: ChatRequest) -> ChatResponse:
     return ChatResponse(reply=ai_reply)
 
 
-@app.post("/stt", response_model=STTResponse)
+@app.post("/api/stt", response_model=STTResponse)
 async def stt_endpoint(audio: UploadFile = File(...)) -> STTResponse:
     audio_bytes = await audio.read()
     if not audio_bytes:
@@ -91,7 +98,7 @@ async def stt_endpoint(audio: UploadFile = File(...)) -> STTResponse:
     return STTResponse(text=text)
 
 
-@app.post("/tts")
+@app.post("/api/tts")
 async def tts_endpoint(request: TTSRequest) -> StreamingResponse:
     if not request.text:
         raise HTTPException(status_code=400, detail="Text cannot be empty")
@@ -104,8 +111,12 @@ async def tts_endpoint(request: TTSRequest) -> StreamingResponse:
     return StreamingResponse(io.BytesIO(audio_bytes), media_type=media_type)
 
 
+# Serve the static frontend (Cloud Run-friendly single service).
+app.mount("/", StaticFiles(directory=str(PROJECT_ROOT / "frontend"), html=True), name="frontend")
+
+
 if __name__ == "__main__":
     import uvicorn
 
-    # Run server on localhost:8000
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

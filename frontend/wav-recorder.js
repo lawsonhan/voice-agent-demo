@@ -27,6 +27,7 @@
             this.minRecordingMs = options.minRecordingMs ?? 500;
 
             this.onSilence = null;
+            this.onRms = null;
 
             this._stream = null;
             this._audioContext = null;
@@ -42,10 +43,15 @@
             this._startTimeMs = null;
             this._lastVoiceTimeMs = null;
             this._hasVoice = false;
+            this._maxRms = 0;
         }
 
         get isRecording() {
             return Boolean(this._stream) && !this._stopped;
+        }
+
+        get maxRms() {
+            return this._maxRms;
         }
 
         async start() {
@@ -127,6 +133,7 @@
             this._stopped = false;
             this._silenceEmitted = false;
             this._hasVoice = false;
+            this._maxRms = 0;
             this._chunks = [];
             this._inputSampleRate = null;
 
@@ -136,6 +143,16 @@
 
         _updateSilenceDetector(input) {
             const rms = computeRms(input);
+            if (rms > this._maxRms) {
+                this._maxRms = rms;
+            }
+            if (typeof this.onRms === 'function') {
+                try {
+                    this.onRms(rms);
+                } catch (error) {
+                    console.error('onRms handler error:', error);
+                }
+            }
             const now = performance.now();
 
             if (rms >= this.silenceThresholdRms) {

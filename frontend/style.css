@@ -154,6 +154,47 @@ body {
   opacity: 1;
 }
 
+.volume-meter {
+  width: 90%;
+  max-width: 520px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  opacity: 0.65;
+  font-family: monospace;
+  font-size: 12px;
+  user-select: none;
+}
+
+.volume-label {
+  width: 52px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.volume-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.volume-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4fc3f7, #00ff99, #ffea00);
+  transition: width 80ms linear;
+}
+
+.volume-value {
+  width: 70px;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.75);
+}
+
 #dev-controls {
   position: fixed;
   bottom: 20px;

@@ -29,6 +29,11 @@
         constructor(elementId) {
             this.element = document.getElementById(elementId);
             this.transcriptDisplay = document.getElementById('transcript');
+            this.volumeMeter = document.getElementById('volume-meter');
+            this.volumeFill = document.getElementById('volume-fill');
+            this.volumeValue = document.getElementById('volume-value');
+            this.latestRms = 0;
+            this.volumeRaf = null;
 
             this.state = STATES.IDLE;
             this.listeningTimer = null;
@@ -39,9 +44,9 @@
             this.audio = null;
             this.fetchController = null;
 
-            this.chatUrl = 'http://localhost:8000/chat';
-            this.sttUrl = 'http://localhost:8000/stt';
-            this.ttsUrl = 'http://localhost:8000/tts';
+            this.chatUrl = '/api/chat';
+            this.sttUrl = '/api/stt';
+            this.ttsUrl = '/api/tts';
 
             if (!this.element) {
                 throw new Error(`Missing element: #${elementId}`);
@@ -74,6 +79,7 @@
             this.cancelActiveWork();
             this.transitionTo(STATES.LISTENING);
             this.updateTranscript('Listening...');
+            this.renderVolume(0);
 
             if (!window.WavRecorder) {
                 this.updateTranscript('Missing wav-recorder.js');
@@ -92,6 +98,11 @@
             this.recorder.onSilence = () => {
                 if (this.state === STATES.LISTENING) {
                     this.stopListening();
+                }
+            };
+            this.recorder.onRms = (rms) => {
+                if (this.state === STATES.LISTENING) {
+                    this.updateVolume(rms);
                 }
             };
 
@@ -164,6 +175,25 @@
                 this.transcriptDisplay.classList.add('active');
             } else {
                 this.transcriptDisplay.classList.remove('active');
+            }
+        }
+
+        updateVolume(rms) {
+            this.latestRms = rms;
+            if (this.volumeRaf) return;
+            this.volumeRaf = requestAnimationFrame(() => {
+                this.volumeRaf = null;
+                this.renderVolume(this.latestRms);
+            });
+        }
+
+        renderVolume(rms) {
+            if (!this.volumeFill || !this.volumeValue) return;
+            const normalized = Math.min(1, rms * 20);
+            this.volumeFill.style.width = `${Math.round(normalized * 100)}%`;
+            this.volumeValue.textContent = rms.toFixed(4);
+            if (this.volumeMeter) {
+                this.volumeMeter.classList.toggle('active', rms > 0.001);
             }
         }
 
@@ -341,6 +371,7 @@
             }
 
             this.clearListeningTimer();
+            this.renderVolume(0);
             this.transitionTo(STATES.IDLE);
         }
 
