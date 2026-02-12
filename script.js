@@ -48,11 +48,16 @@
             this.element = document.getElementById(elementId);
             this.transcriptDisplay = document.getElementById('transcript');
             this.historyContainer = document.getElementById('history-messages');
+            this.historyPanel = document.getElementById('history-panel');
+            this.historyToggleButton = document.getElementById('history-toggle');
+            this.historyCloseButton = document.getElementById('history-close');
+            this.historyBackdrop = document.getElementById('history-backdrop');
             this.volumeMeter = document.getElementById('volume-meter');
             this.volumeFill = document.getElementById('volume-fill');
             this.volumeValue = document.getElementById('volume-value');
             this.latestRms = 0;
             this.volumeRaf = null;
+            this.mobilePanelMediaQuery = window.matchMedia('(max-width: 900px)');
 
             this.state = STATES.IDLE;
             this.listeningTimer = null;
@@ -83,6 +88,8 @@
                 });
             });
 
+            this.initHistoryPanelControls();
+
             // Show an initial empty state, then load from backend.
             this.renderHistory([]);
 
@@ -105,6 +112,73 @@
 
             if (this.state === STATES.SPEAKING || this.state === STATES.PROCESSING) {
                 this.cancelActiveWork();
+            }
+        }
+
+        initHistoryPanelControls() {
+            if (!this.historyPanel || !this.historyToggleButton || !this.historyCloseButton || !this.historyBackdrop) {
+                return;
+            }
+
+            const syncForViewport = () => {
+                if (this.mobilePanelMediaQuery.matches) {
+                    this.historyBackdrop.hidden = false;
+                    this.setHistoryPanelOpen(false);
+                    return;
+                }
+
+                document.body.classList.remove('history-panel-open');
+                this.historyBackdrop.hidden = true;
+                this.syncHistoryPanelAria(false);
+            };
+
+            this.historyToggleButton.addEventListener('click', () => {
+                if (!this.mobilePanelMediaQuery.matches) return;
+                const isOpen = document.body.classList.contains('history-panel-open');
+                this.setHistoryPanelOpen(!isOpen);
+            });
+
+            this.historyCloseButton.addEventListener('click', () => {
+                this.setHistoryPanelOpen(false);
+            });
+
+            this.historyBackdrop.addEventListener('click', () => {
+                this.setHistoryPanelOpen(false);
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    this.setHistoryPanelOpen(false);
+                }
+            });
+
+            if (typeof this.mobilePanelMediaQuery.addEventListener === 'function') {
+                this.mobilePanelMediaQuery.addEventListener('change', syncForViewport);
+            } else if (typeof this.mobilePanelMediaQuery.addListener === 'function') {
+                this.mobilePanelMediaQuery.addListener(syncForViewport);
+            }
+            syncForViewport();
+        }
+
+        setHistoryPanelOpen(isOpen) {
+            if (!this.mobilePanelMediaQuery.matches) {
+                document.body.classList.remove('history-panel-open');
+                this.syncHistoryPanelAria(false);
+                return;
+            }
+
+            document.body.classList.toggle('history-panel-open', isOpen);
+            this.syncHistoryPanelAria(isOpen);
+        }
+
+        syncHistoryPanelAria(isOpen) {
+            if (this.historyToggleButton) {
+                this.historyToggleButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            }
+
+            if (this.historyPanel) {
+                const panelHidden = this.mobilePanelMediaQuery.matches ? !isOpen : false;
+                this.historyPanel.setAttribute('aria-hidden', panelHidden ? 'true' : 'false');
             }
         }
 

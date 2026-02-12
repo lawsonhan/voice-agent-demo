@@ -9,9 +9,18 @@
 <body>
 
 <div id="app">
+  <button id="history-toggle" class="history-toggle" aria-controls="history-panel" aria-expanded="false">
+    對話記錄
+  </button>
+  <div id="history-backdrop" class="history-backdrop" hidden></div>
   <aside id="history-panel" aria-label="對話記錄">
     <div class="history-header">
-      <div class="history-title">對話記錄</div>
+      <div class="history-header-row">
+        <div class="history-title">對話記錄</div>
+        <button id="history-close" class="history-close" type="button" aria-label="關閉對話記錄">
+          關閉
+        </button>
+      </div>
       <div class="history-subtitle">只會保留最近 4 輪</div>
     </div>
     <div id="history-messages" class="history-messages"></div>
