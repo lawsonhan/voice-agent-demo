@@ -63,10 +63,15 @@
             this.audio = null;
             this.fetchController = null;
 
-            this.chatUrl = 'http://localhost:8000/chat';
-            this.sttUrl = 'http://localhost:8000/stt';
-            this.ttsUrl = 'http://localhost:8000/tts';
-            this.historyUrl = 'http://localhost:8000/history';
+            const runningFrontendOnLocal3000 =
+                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+                window.location.port === '3000';
+            const backendBaseUrl = runningFrontendOnLocal3000 ? 'http://localhost:8000' : '';
+
+            this.chatUrl = `${backendBaseUrl}/chat`;
+            this.sttUrl = `${backendBaseUrl}/stt`;
+            this.ttsUrl = `${backendBaseUrl}/tts`;
+            this.historyUrl = `${backendBaseUrl}/history`;
 
             if (!this.element) {
                 throw new Error(`Missing element: #${elementId}`);

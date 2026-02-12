@@ -48,6 +48,13 @@ python -m http.server 3000
 
 Open `http://localhost:3000`.
 
+Single-process mode (backend also serves frontend at `/`):
+```bash
+uvicorn backend.main:app --app-dir backend --host 127.0.0.1 --port 8000
+```
+
+Open `http://localhost:8000`.
+
 ## Usage
 
 - Click the face to start recording.
@@ -60,3 +67,24 @@ Open `http://localhost:3000`.
 - `.env` is auto-loaded by the backend (via `python-dotenv`).
 - If STT/TTS fails, check backend logs and confirm API keys in `.env`.
 - See `structure.md` for a detailed explanation of the code structure (香港繁體中文).
+
+## Cloud Run (Docker)
+
+Build and push the image:
+```bash
+gcloud builds submit --tag gcr.io/PROJECT_ID/voice-agent-demo
+```
+
+Deploy to Cloud Run:
+```bash
+gcloud run deploy voice-agent-demo \
+  --image gcr.io/PROJECT_ID/voice-agent-demo \
+  --platform managed \
+  --region REGION \
+  --allow-unauthenticated \
+  --set-env-vars CANTONESE_API_KEY=YOUR_KEY,POE_API_KEY=YOUR_KEY
+```
+
+After deployment:
+- App UI: `https://YOUR_CLOUD_RUN_URL/`
+- Health check: `https://YOUR_CLOUD_RUN_URL/healthz`

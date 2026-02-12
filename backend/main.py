@@ -7,10 +7,13 @@ from typing import Dict, List, Literal
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from services import UpstreamServiceError, query_poe, synthesize_speech, transcribe_audio
+try:
+    from .services import UpstreamServiceError, query_poe, synthesize_speech, transcribe_audio
+except ImportError:
+    from services import UpstreamServiceError, query_poe, synthesize_speech, transcribe_audio
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
@@ -66,9 +69,29 @@ class HistoryResponse(BaseModel):
     messages: List[ChatMessage]
 
 
-@app.get("/")
-def read_root() -> StatusResponse:
+@app.get("/healthz")
+def healthcheck() -> StatusResponse:
     return StatusResponse(status="後端已啟動")
+
+
+@app.get("/", include_in_schema=False)
+def frontend_index() -> FileResponse:
+    return FileResponse(PROJECT_ROOT / "index.html")
+
+
+@app.get("/script.js", include_in_schema=False)
+def frontend_script() -> FileResponse:
+    return FileResponse(PROJECT_ROOT / "script.js")
+
+
+@app.get("/style.css", include_in_schema=False)
+def frontend_style() -> FileResponse:
+    return FileResponse(PROJECT_ROOT / "style.css")
+
+
+@app.get("/wav-recorder.js", include_in_schema=False)
+def frontend_wav_recorder() -> FileResponse:
+    return FileResponse(PROJECT_ROOT / "wav-recorder.js")
 
 
 @app.get("/history", response_model=HistoryResponse)
