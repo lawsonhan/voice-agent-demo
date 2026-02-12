@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>語音小幫手</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+  <aside id="history-panel" aria-label="對話記錄">
+    <div class="history-header">
+      <div class="history-title">對話記錄</div>
+      <div class="history-subtitle">只會保留最近 4 輪</div>
+    </div>
+    <div id="history-messages" class="history-messages"></div>
+  </aside>
+
+  <main id="main">
+<div class="orb-button" id="agent-button" data-state="idle">
+  
+  <div class="robot-face">
+    <div class="eye left"></div>
+    <div class="eye right"></div>
+  </div>
+
+</div>
+
+<div id="transcript" class="transcript-display"></div>
+<div id="volume-meter" class="volume-meter" aria-live="polite">
+  <div class="volume-label">音量</div>
+  <div class="volume-bar">
+    <div id="volume-fill" class="volume-fill"></div>
+  </div>
+  <div id="volume-value" class="volume-value">0.0000</div>
+</div>
+</main>
+</div>
+
+<div id="dev-controls">
+  <div class="dev-label">動畫測試用</div>
+  <div class="dev-buttons">
+    <button class="dev-btn" data-state="idle">待機</button>
+    <button class="dev-btn" data-state="listening">聆聽</button>
+    <button class="dev-btn" data-state="processing">處理中</button>
+    <button class="dev-btn" data-state="speaking">說話中</button>
+  </div>
+</div>
+
+<script src="wav-recorder.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

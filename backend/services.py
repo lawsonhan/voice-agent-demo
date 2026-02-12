@@ -11,7 +11,7 @@ Upstreams:
 """
 
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -43,7 +43,7 @@ class UpstreamServiceError(RuntimeError):
 def _get_required_env(name: str) -> str:
     value = os.getenv(name)
     if not value:
-        raise UpstreamServiceError(f"Missing required environment variable: {name}.")
+        raise UpstreamServiceError(f"缺少必要環境變數：{name}")
     return value
 
 
@@ -119,24 +119,31 @@ async def _post(
     except httpx.HTTPStatusError as exc:
         detail = exc.response.text
         raise UpstreamServiceError(
-            f"{service_name} error (status {exc.response.status_code}): {detail}"
+            f"{service_name} 出錯（狀態碼 {exc.response.status_code}）：{detail}"
         ) from exc
     except httpx.RequestError as exc:
-        raise UpstreamServiceError(f"{service_name} request failed: {exc}") from exc
+        raise UpstreamServiceError(f"{service_name} 連線失敗：{exc}") from exc
 
 
-async def query_poe(user_message: str) -> str:
-    """Call Poe chat completions and return the assistant message content."""
+async def query_poe(user_message: str, history_messages: List[Dict[str, str]]) -> str:
+    """Call Poe chat completions and return the assistant message content.
+
+    `history_messages` is a list of OpenAI-style chat messages, e.g.
+    [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+    """
 
     api_key = _get_required_env("POE_API_KEY")
     model = _get_env_str("POE_MODEL", DEFAULT_POE_MODEL)
 
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        *history_messages,
+        {"role": "user", "content": user_message},
+    ]
+
     payload = {
         "model": model,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message},
-        ],
+        "messages": messages,
         "stream": False,
     }
 
@@ -158,7 +165,7 @@ async def query_poe(user_message: str) -> str:
     try:
         return data["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError, AttributeError) as exc:
-        raise UpstreamServiceError("Unexpected response format from Poe API.") from exc
+        raise UpstreamServiceError("Poe API 回傳格式唔啱（無法解析）。") from exc
 
 
 async def transcribe_audio(audio_bytes: bytes, filename: str, content_type: Optional[str]) -> str:
@@ -167,7 +174,7 @@ async def transcribe_audio(audio_bytes: bytes, filename: str, content_type: Opti
     api_key = _get_required_env("CANTONESE_API_KEY")
 
     if not audio_bytes:
-        raise UpstreamServiceError("Audio payload is empty.")
+        raise UpstreamServiceError("音訊內容係空嘅。")
 
     data = {
         "api_key": api_key,
@@ -194,7 +201,7 @@ async def transcribe_audio(audio_bytes: bytes, filename: str, content_type: Opti
     payload = response.json()
     text = payload.get("text", "")
     if not isinstance(text, str):
-        raise UpstreamServiceError("Unexpected response format from STT API.")
+        raise UpstreamServiceError("STT 回傳格式唔啱（無法解析）。")
 
     return text.strip()
 
@@ -231,6 +238,6 @@ async def synthesize_speech(text: str) -> Tuple[bytes, str]:
 
     audio_bytes = response.content
     if not audio_bytes:
-        raise UpstreamServiceError("TTS API returned empty audio payload.")
+        raise UpstreamServiceError("TTS 回傳咗空嘅音訊。")
 
     return audio_bytes, _tts_media_type(output_extension)

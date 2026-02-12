@@ -56,14 +56,14 @@
 
         async start() {
             if (this.isRecording) {
-                throw new Error('Recorder already started');
+                throw new Error('錄音已經開始咗');
             }
 
             this._resetState();
 
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (!AudioContext) {
-                throw new Error('AudioContext is not supported in this browser');
+                throw new Error('呢個瀏覽器唔支援 AudioContext');
             }
 
             // Request microphone permission.
@@ -81,7 +81,7 @@
             this._sourceNode = this._audioContext.createMediaStreamSource(this._stream);
 
             if (!this._audioContext.createScriptProcessor) {
-                throw new Error('ScriptProcessorNode is not supported in this browser');
+                throw new Error('呢個瀏覽器唔支援 ScriptProcessorNode');
             }
 
             const bufferSize = 4096;
@@ -193,7 +193,7 @@
 
         async _stopCaptureAndGetSamples() {
             if (this._stopped) {
-                throw new Error('Recorder already stopped');
+                throw new Error('錄音已經停止咗');
             }
             this._stopped = true;
 
@@ -203,7 +203,7 @@
             this._chunks = [];
 
             if (!merged.length) {
-                throw new Error('No audio captured');
+                throw new Error('錄唔到任何聲音');
             }
 
             return merged;

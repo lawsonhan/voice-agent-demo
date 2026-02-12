@@ -1,16 +1,16 @@
+import asyncio
 import io
 import logging
-import os
 from pathlib import Path
+from typing import Dict, List, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from backend.services import UpstreamServiceError, query_poe, synthesize_speech, transcribe_audio
+from services import UpstreamServiceError, query_poe, synthesize_speech, transcribe_audio
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
@@ -19,6 +19,12 @@ logger = logging.getLogger("voice-agent-demo")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Voice Agent Backend")
+
+# Keep a short in-memory chat history (sliding window).
+# This is intentionally simple for classroom use: one conversation per backend process.
+CHAT_WINDOW_TURNS = 4  # last N user+assistant turns
+_chat_history: List[Dict[str, str]] = []
+_chat_lock = asyncio.Lock()
 
 # Enable CORS so our frontend (which might run on a different port or file://) can query this API
 app.add_middleware(
@@ -50,41 +56,77 @@ class StatusResponse(BaseModel):
     status: str
 
 
-@app.get("/healthz")
-def healthz():
-    return {"ok": True}
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
 
 
-@app.get("/api/status")
+class HistoryResponse(BaseModel):
+    max_turns: int
+    messages: List[ChatMessage]
+
+
+@app.get("/")
 def read_root() -> StatusResponse:
-    return StatusResponse(status="Voice Agent Backend is running")
+    return StatusResponse(status="後端已啟動")
 
 
-@app.post("/api/chat", response_model=ChatResponse)
+@app.get("/history", response_model=HistoryResponse)
+async def history_endpoint() -> HistoryResponse:
+    """Return the current in-memory chat history (sliding window)."""
+
+    async with _chat_lock:
+        history_snapshot = list(_chat_history)
+
+    messages: List[ChatMessage] = []
+    for item in history_snapshot:
+        # Keep the response strict and predictable.
+        if item.get("role") in ("user", "assistant") and isinstance(item.get("content"), str):
+            messages.append(ChatMessage(role=item["role"], content=item["content"]))
+
+    return HistoryResponse(max_turns=CHAT_WINDOW_TURNS, messages=messages)
+
+
+@app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest) -> ChatResponse:
     """
     Receives text from frontend, queries Poe, returns AI text reply.
     """
     if not request.message:
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
+        raise HTTPException(status_code=400, detail="訊息唔可以留空")
 
     logger.info("User said: %s", request.message)
 
     try:
-        ai_reply = await query_poe(request.message)
+        async with _chat_lock:
+            history_snapshot = list(_chat_history)
+
+        logger.info("History messages (before): %d", len(history_snapshot))
+
+        ai_reply = await query_poe(request.message, history_snapshot)
     except UpstreamServiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     logger.info("AI replied: %s", ai_reply)
 
+    async with _chat_lock:
+        _chat_history.append({"role": "user", "content": request.message})
+        _chat_history.append({"role": "assistant", "content": ai_reply})
+
+        max_messages = CHAT_WINDOW_TURNS * 2
+        if len(_chat_history) > max_messages:
+            del _chat_history[:-max_messages]
+
+        logger.info("History messages (after): %d", len(_chat_history))
+
     return ChatResponse(reply=ai_reply)
 
 
-@app.post("/api/stt", response_model=STTResponse)
+@app.post("/stt", response_model=STTResponse)
 async def stt_endpoint(audio: UploadFile = File(...)) -> STTResponse:
     audio_bytes = await audio.read()
     if not audio_bytes:
-        raise HTTPException(status_code=400, detail="Audio file is empty")
+        raise HTTPException(status_code=400, detail="音訊檔案係空嘅")
 
     try:
         text = await transcribe_audio(
@@ -98,10 +140,10 @@ async def stt_endpoint(audio: UploadFile = File(...)) -> STTResponse:
     return STTResponse(text=text)
 
 
-@app.post("/api/tts")
+@app.post("/tts")
 async def tts_endpoint(request: TTSRequest) -> StreamingResponse:
     if not request.text:
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
+        raise HTTPException(status_code=400, detail="文字唔可以留空")
 
     try:
         audio_bytes, media_type = await synthesize_speech(request.text)
@@ -111,12 +153,8 @@ async def tts_endpoint(request: TTSRequest) -> StreamingResponse:
     return StreamingResponse(io.BytesIO(audio_bytes), media_type=media_type)
 
 
-# Serve the static frontend (Cloud Run-friendly single service).
-app.mount("/", StaticFiles(directory=str(PROJECT_ROOT / "frontend"), html=True), name="frontend")
-
-
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("PORT", "8000"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Run server on localhost:8000
+    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -36,34 +36,24 @@ cp .env.example .env
 
 ## Run
 
+Backend:
 ```bash
 python3 backend/main.py
 ```
 
-Open `http://localhost:8000`.
-
-## Deploy (Cloud Run)
-
-This repo includes a `Dockerfile` that serves both the frontend and backend from one Cloud Run service.
-
-Required environment variables:
-- `CANTONESE_API_KEY`
-- `POE_API_KEY`
-
-Example (CLI):
+Frontend:
 ```bash
-gcloud run deploy voice-agent-demo \
-  --source . \
-  --region YOUR_REGION \
-  --allow-unauthenticated \
-  --set-env-vars CANTONESE_API_KEY=...,POE_API_KEY=...
+python -m http.server 3000
 ```
+
+Open `http://localhost:3000`.
 
 ## Usage
 
 - Click the face to start recording.
 - Click again to stop (or wait for silence/timeout).
 - The agent will transcribe, reply, and speak.
+- The left floating panel shows the agent's current short-term memory (sliding window).
 
 ## Notes
 

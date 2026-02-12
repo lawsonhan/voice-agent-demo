@@ -36,6 +36,33 @@ voice-agent-demo/
 6. 後端把回覆送到 Cantonese AI TTS，取得音訊 bytes。
 7. 前端播放後端回傳的音訊。
 
+## 對話記憶（簡單滑動窗口）
+
+為了教學目的，我們只做一個「固定長度」的短記憶：保留最近幾輪對話，讓 AI 可以承接上一句。
+
+- 位置：後端 `backend/main.py`
+- 形式：記憶只存在記憶體（memory）內，重啟後端就會清空
+- 策略：只保留最近 `CHAT_WINDOW_TURNS = 4` 輪（即最多 8 條訊息：user+assistant）
+
+每次 `/chat`：
+
+- 先取出目前歷史（snapshot）
+- 把「system prompt + 歷史 + 今次 user」送去 Poe
+- 收到回覆後，再把今次 user/assistant 加入歷史，並把最舊的丟走（滑動窗口）
+
+### 前端懸浮視窗顯示記憶
+
+前端左邊會有一個「對話記錄」懸浮視窗，用來顯示後端目前記住的滑動窗口內容。
+
+- 位置：`index.html`（`#history-panel` / `#history-messages`）
+- 取數：`script.js` 會呼叫後端 `GET /history`
+- 刷新不會丟：只要後端未重啟，`/history` 會回傳同一份記憶，所以重新整理頁面都仍然睇到
+
+後端 `GET /history`：
+
+- 回傳 `{ max_turns, messages }`
+- `messages` 只包含 `user` / `assistant`（不會包含 system prompt）
+
 ## 前端（index.html / script.js / wav-recorder.js）
 
 ### UI 狀態機（script.js）
