@@ -539,7 +539,7 @@
             } catch (error) {
                 if (isPlaybackBlockedError(error)) {
                     this.pendingPlayback = true;
-                    this.transitionTo(STATES.IDLE);
+                    this.transitionTo(STATES.SPEAKING);
                     this.updateTranscript(UI_TEXT.playbackBlocked);
                     return;
                 }
@@ -560,6 +560,7 @@
                 this.pendingPlayback = false;
             } catch (error) {
                 if (isPlaybackBlockedError(error)) {
+                    this.transitionTo(STATES.SPEAKING);
                     this.updateTranscript(UI_TEXT.playbackBlocked);
                     return;
                 }
