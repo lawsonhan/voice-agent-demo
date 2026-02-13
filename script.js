@@ -27,7 +27,8 @@
         sttErrorPrefix: '語音識別出錯：',
         chatErrorPrefix: '對話服務出錯：',
         ttsErrorPrefix: '語音合成出錯：',
-        recorderNotStarted: '未開始錄音'
+        recorderNotStarted: '未開始錄音',
+        playbackBlocked: '手機瀏覽器阻擋咗自動播放，請再點一下個播聲。'
     };
 
     const CONFIG = {
@@ -67,11 +68,12 @@
 
             this.audio = null;
             this.fetchController = null;
+            this.pendingPlayback = false;
 
-            const runningFrontendOnLocal3000 =
-                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
-                window.location.port === '3000';
-            const backendBaseUrl = runningFrontendOnLocal3000 ? 'http://localhost:8000' : '';
+            const runningStandaloneFrontend = window.location.port === '3000';
+            const backendBaseUrl = runningStandaloneFrontend
+                ? window.location.origin.replace(/:3000$/, ':8000')
+                : '';
 
             this.chatUrl = `${backendBaseUrl}/chat`;
             this.sttUrl = `${backendBaseUrl}/stt`;
@@ -100,6 +102,11 @@
         }
 
         async handleInteraction() {
+            if (this.pendingPlayback) {
+                await this.resumeBlockedPlayback();
+                return;
+            }
+
             if (this.state === STATES.IDLE) {
                 await this.startListening();
                 return;
@@ -507,6 +514,9 @@
 
             const audioUrl = URL.createObjectURL(audioBlob);
             this.audio = new Audio(audioUrl);
+            this.audio.preload = 'auto';
+            this.audio.playsInline = true;
+            this.audio.setAttribute('playsinline', '');
 
             this.audio.onplay = () => {
                 this.transitionTo(STATES.SPEAKING);
@@ -524,7 +534,37 @@
                 this.transitionTo(STATES.IDLE);
             };
 
-            await this.audio.play();
+            try {
+                await this.audio.play();
+            } catch (error) {
+                if (isPlaybackBlockedError(error)) {
+                    this.pendingPlayback = true;
+                    this.transitionTo(STATES.IDLE);
+                    this.updateTranscript(UI_TEXT.playbackBlocked);
+                    return;
+                }
+
+                URL.revokeObjectURL(audioUrl);
+                throw error;
+            }
+        }
+
+        async resumeBlockedPlayback() {
+            if (!this.audio) {
+                this.pendingPlayback = false;
+                return;
+            }
+
+            try {
+                await this.audio.play();
+                this.pendingPlayback = false;
+            } catch (error) {
+                if (isPlaybackBlockedError(error)) {
+                    this.updateTranscript(UI_TEXT.playbackBlocked);
+                    return;
+                }
+                throw error;
+            }
         }
 
         cancelActiveWork() {
@@ -539,6 +579,7 @@
                 this.audio.pause();
                 this.audio.currentTime = 0;
             }
+            this.pendingPlayback = false;
 
             // Cancel recording.
             if (this.recorder) {
@@ -568,6 +609,14 @@
 
     function isAbortError(error) {
         return Boolean(error && error.name === 'AbortError');
+    }
+
+    function isPlaybackBlockedError(error) {
+        if (!error) return false;
+        if (error.name === 'NotAllowedError') return true;
+
+        const message = String(error.message || '').toLowerCase();
+        return message.includes('not allowed') || message.includes('gesture') || message.includes('user interaction');
     }
 
     function formatUserFacingError(error) {
