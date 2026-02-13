@@ -66,7 +66,10 @@
             this.recorder = null;
             this.isStoppingRecording = false;
 
-            this.audio = null;
+            this.audio = this.createAudioElement();
+            this.currentAudioUrl = null;
+            this.silenceAudioUrl = null;
+            this.playbackUnlocked = false;
             this.fetchController = null;
             this.pendingPlayback = false;
 
@@ -108,6 +111,7 @@
             }
 
             if (this.state === STATES.IDLE) {
+                await this.ensurePlaybackUnlocked();
                 await this.startListening();
                 return;
             }
@@ -284,6 +288,47 @@
             if (this.listeningTimer) {
                 clearTimeout(this.listeningTimer);
                 this.listeningTimer = null;
+            }
+        }
+
+        createAudioElement() {
+            const audio = new Audio();
+            audio.preload = 'auto';
+            audio.playsInline = true;
+            audio.setAttribute('playsinline', '');
+            return audio;
+        }
+
+        releaseCurrentAudioUrl() {
+            if (!this.currentAudioUrl) return;
+            URL.revokeObjectURL(this.currentAudioUrl);
+            this.currentAudioUrl = null;
+        }
+
+        async ensurePlaybackUnlocked() {
+            if (this.playbackUnlocked || !this.audio) return;
+
+            if (!this.silenceAudioUrl) {
+                this.silenceAudioUrl = URL.createObjectURL(createSilentWavBlob());
+            }
+
+            const previousMuted = this.audio.muted;
+
+            try {
+                this.audio.pause();
+                this.audio.currentTime = 0;
+                this.audio.muted = true;
+                this.audio.src = this.silenceAudioUrl;
+                await this.audio.play();
+                this.audio.pause();
+                this.audio.currentTime = 0;
+                this.playbackUnlocked = true;
+            } catch (error) {
+                console.warn('Playback warm-up failed:', error);
+            } finally {
+                this.audio.muted = previousMuted;
+                this.audio.removeAttribute('src');
+                this.audio.load();
             }
         }
 
@@ -504,21 +549,21 @@
         }
 
         async playAudioBlob(audioBlob, transcriptText) {
-            // Stop previous audio.
-            if (this.audio) {
-                this.audio.pause();
-                if (this.audio.src) {
-                    URL.revokeObjectURL(this.audio.src);
-                }
+            if (!this.audio) {
+                this.audio = this.createAudioElement();
             }
 
+            // Stop previous audio.
+            this.audio.pause();
+            this.audio.currentTime = 0;
+            this.releaseCurrentAudioUrl();
+
             const audioUrl = URL.createObjectURL(audioBlob);
-            this.audio = new Audio(audioUrl);
-            this.audio.preload = 'auto';
-            this.audio.playsInline = true;
-            this.audio.setAttribute('playsinline', '');
+            this.currentAudioUrl = audioUrl;
+            this.audio.src = audioUrl;
 
             this.audio.onplay = () => {
+                this.playbackUnlocked = true;
                 this.transitionTo(STATES.SPEAKING);
                 this.updateTranscript(transcriptText);
             };
@@ -526,11 +571,16 @@
             this.audio.onended = () => {
                 this.transitionTo(STATES.IDLE);
                 this.updateTranscript('');
-                URL.revokeObjectURL(audioUrl);
+                this.releaseCurrentAudioUrl();
+                this.audio.removeAttribute('src');
+                this.audio.load();
             };
 
             this.audio.onerror = (event) => {
                 console.error('Audio playback error:', event);
+                this.releaseCurrentAudioUrl();
+                this.audio.removeAttribute('src');
+                this.audio.load();
                 this.transitionTo(STATES.IDLE);
             };
 
@@ -544,7 +594,9 @@
                     return;
                 }
 
-                URL.revokeObjectURL(audioUrl);
+                this.releaseCurrentAudioUrl();
+                this.audio.removeAttribute('src');
+                this.audio.load();
                 throw error;
             }
         }
@@ -558,6 +610,7 @@
             try {
                 await this.audio.play();
                 this.pendingPlayback = false;
+                this.playbackUnlocked = true;
             } catch (error) {
                 if (isPlaybackBlockedError(error)) {
                     this.transitionTo(STATES.SPEAKING);
@@ -579,7 +632,10 @@
             if (this.audio) {
                 this.audio.pause();
                 this.audio.currentTime = 0;
+                this.audio.removeAttribute('src');
+                this.audio.load();
             }
+            this.releaseCurrentAudioUrl();
             this.pendingPlayback = false;
 
             // Cancel recording.
@@ -639,6 +695,41 @@
         }
 
         return UI_TEXT.unknownError;
+    }
+
+    function createSilentWavBlob(durationMs = 120, sampleRate = 8000) {
+        const sampleCount = Math.max(1, Math.floor((sampleRate * durationMs) / 1000));
+        const bitsPerSample = 16;
+        const bytesPerSample = bitsPerSample / 8;
+        const channelCount = 1;
+        const byteRate = sampleRate * channelCount * bytesPerSample;
+        const blockAlign = channelCount * bytesPerSample;
+        const dataSize = sampleCount * blockAlign;
+
+        const buffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(buffer);
+
+        writeAscii(view, 0, 'RIFF');
+        view.setUint32(4, 36 + dataSize, true);
+        writeAscii(view, 8, 'WAVE');
+        writeAscii(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, channelCount, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, byteRate, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, bitsPerSample, true);
+        writeAscii(view, 36, 'data');
+        view.setUint32(40, dataSize, true);
+
+        return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function writeAscii(view, offset, text) {
+        for (let i = 0; i < text.length; i += 1) {
+            view.setUint8(offset + i, text.charCodeAt(i));
+        }
     }
 
     function initDevControls(agent) {
